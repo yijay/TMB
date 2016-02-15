@@ -1,0 +1,128 @@
+#include <TMB.hpp>
+template<class Type>
+Type objective_function<Type>::operator() ()
+{
+  DATA_ARRAY(wtage);
+  DATA_ARRAY(wt_sd);
+
+  // matrix<Type> yfit(n);
+  int nr = wtage.dim(0);
+  int nc = wtage.dim(1);
+
+  PARAMETER(log_sd_coh);
+  PARAMETER(log_sd_yr );
+  PARAMETER_VECTOR(mnwt );
+  PARAMETER_VECTOR(coh_eff); //  (styr-nages-age_st+1,endyr-age_st+3,3);
+  PARAMETER_VECTOR( yr_eff); //  yr_eff(styr,endyr+3,3);
+
+  Type nll = 0.0;
+
+  Type sigma_coh = exp(log_sd_coh);
+  Type sigma_yr  = exp(log_sd_yr );
+  matrix<Type> wt_pre(nr,nc);
+  matrix<Type> chi(nr,nc);
+  for (int i=0;i<nr;i++)
+  {
+    wt_pre.row(i) = mnwt*exp(sigma_yr*yr_eff(i));
+    for (int j=0;j<nc;j++)
+    {
+      wt_pre(i,j) *= exp(sigma_coh*coh_eff(i-j));
+      if (i <= nr-1)
+        nll += pow(wtage(i,j)-wt_pre(i,j),Type(2.))/(2.*pow(wt_sd(i,j),2));
+    }
+    // nll -= dnorm(coh_eff,Type(0),sigma_coh,true);
+    nll -= dnorm( yr_eff(i),Type(0),sigma_yr,true );
+  }
+  /*
+  if (sd_phase())
+  {
+    wt_last = wt_pre(endyr)  *exp(sigma_coh*sigma_coh/2. + sigma_yr*sigma_yr/2.);
+    wt_cur  = wt_pre(endyr+1)*exp(sigma_coh*sigma_coh/2. + sigma_yr*sigma_yr/2.);;
+    wt_next = wt_pre(endyr+2)*exp(sigma_coh*sigma_coh/2. + sigma_yr*sigma_yr/2.);;
+    wt_yraf = wt_pre(endyr+3)*exp(sigma_coh*sigma_coh/2. + sigma_yr*sigma_yr/2.);;
+    sig_coh = exp(log_sd_coh);
+    sig_yr  = exp(log_sd_yr );
+  }
+  */
+
+  
+  return nll;
+}
+  /*
+	init_int styr
+  init_int endyr
+  init_int age_st
+  init_int age_end
+  int nages;
+  !! nages = age_end - age_st +1;
+  init_matrix wt_obs(styr,endyr,age_st,age_end)
+  init_matrix sd_obs(styr,endyr,age_st,age_end)
+	int ret
+ LOCAL_CALCS
+  ret=0;
+  if (ad_comm::argc > 1)
+  {
+    int on=0;
+    if ( (on=option_match(ad_comm::argc,ad_comm::argv,"-ret"))>-1)
+    {
+      if (on>ad_comm::argc-2 | ad_comm::argv[on+1][0] == '-')
+      {
+        cerr << "Invalid number of iseed arguements, command line option -ret ignored" << endl;
+      }
+      else
+      {
+        ret = atoi(ad_comm::argv[on+1]);
+      }
+    }
+		endyr= endyr - ret;
+  }
+  cout <<endyr<<endl;//exit(1);
+ END_CALCS
+INITIALIZATION_SECTION
+
+PARAMETER_SECTION
+  matrix wt_pre(styr,endyr+3,age_st,age_end)
+  init_vector mnwt(age_st,age_end);
+  sdreport_number sig_coh
+  sdreport_number sig_yr
+  sdreport_vector wt_last(age_st,age_end);
+  sdreport_vector wt_cur(age_st,age_end);
+  sdreport_vector wt_next(age_st,age_end);
+  sdreport_vector wt_yraf(age_st,age_end);
+
+
+  // init_bounded_vector coh_eff(styr-nages-age_st+1,endyr-age_st,-5,5,2);
+  // init_bounded_vector yr_eff(styr,endyr,-5,5,3);
+  random_effects_vector coh_eff(styr-nages-age_st+1,endyr-age_st+3,3);
+  random_effects_vector yr_eff(styr,endyr+3,3);
+
+  objective_function_value nll;
+
+  PROCEDURE_SECTION
+  dvariable sigma_coh = (mfexp(log_sd_coh));
+  dvariable sigma_yr = (mfexp(log_sd_yr ));
+  for (int i=styr;i<=endyr+3;i++)
+  {
+    wt_pre(i) = mnwt*exp(sigma_yr*yr_eff(i));
+    for (int j=age_st;j<=age_end;j++)
+    {
+      wt_pre(i,j) *= exp(sigma_coh*coh_eff(i-j));
+      if (i <= endyr)
+        nll += square(wt_obs(i,j)-wt_pre(i,j))/(2.*square(sd_obs(i,j)));
+    }
+  }
+  nll += 0.5*norm2(coh_eff);
+	nll += 0.5*norm2( yr_eff);
+  if (sd_phase())
+  {
+    wt_last = wt_pre(endyr)  *exp(sigma_coh*sigma_coh/2. + sigma_yr*sigma_yr/2.);
+    wt_cur  = wt_pre(endyr+1)*exp(sigma_coh*sigma_coh/2. + sigma_yr*sigma_yr/2.);;
+    wt_next = wt_pre(endyr+2)*exp(sigma_coh*sigma_coh/2. + sigma_yr*sigma_yr/2.);;
+    wt_yraf = wt_pre(endyr+3)*exp(sigma_coh*sigma_coh/2. + sigma_yr*sigma_yr/2.);;
+    sig_coh = exp(log_sd_coh);
+    sig_yr  = exp(log_sd_yr );
+  }
+
+  REPORT_SECTION
+ report << wt_pre<<endl;
+  */
